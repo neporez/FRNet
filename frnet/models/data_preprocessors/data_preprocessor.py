@@ -52,7 +52,7 @@ class FrustumRangePreprocessor(BaseDataPreprocessor):
             dict: Data in the same format as the model input.
         """
         data = self.cast_data(data)
-        data.setdefault('data_samples', None)
+        data.setdefault('data_samples', None) # ground_truth인 경우에는 None이 아니라 dict(gt_pts_seg = 'pts_semantic_mask') 인듯
 
         inputs, data_samples = data['inputs'], data['data_samples']
         batch_inputs = dict()
@@ -81,7 +81,7 @@ class FrustumRangePreprocessor(BaseDataPreprocessor):
         coors = []
         voxels = []
 
-        for i, res in enumerate(points):
+        for i, res in enumerate(points): # index, res = (x,y,z,r)
             depth = torch.linalg.norm(res[:, :3], 2, dim=1)
             yaw = -torch.atan2(res[:, 1], res[:, 0])
             pitch = torch.arcsin(res[:, 2] / depth)
@@ -103,7 +103,7 @@ class FrustumRangePreprocessor(BaseDataPreprocessor):
                 coors_y, min=0, max=self.H - 1).type(torch.int64)
 
             res_coors = torch.stack([coors_y, coors_x], dim=1)
-            res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i)
+            res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i) # (N=point 개수, 3) -> 각 값 (y,x,batch_index)
             coors.append(res_coors)
             voxels.append(res)
 
@@ -114,19 +114,19 @@ class FrustumRangePreprocessor(BaseDataPreprocessor):
                 seg_label = torch.ones(
                     (self.H, self.W),
                     dtype=torch.long,
-                    device=pts_semantic_mask.device) * self.ignore_index
+                    device=pts_semantic_mask.device) * self.ignore_index # (H,W) 크기의 voxel을 안쓰는 라벨링 번호로 초기화(1Xself.ignore_index)
                 res_voxel_coors, inverse_map = torch.unique(
-                    res_coors, return_inverse=True, dim=0)
+                    res_coors, return_inverse=True, dim=0) #res_voxel_coors=중복 제거한 voxel, inverse_map 중복된 것끼리 같은 인덱스 맵 ex) [0,0,1,0,2,3 ...]
                 voxel_semantic_mask = torch_scatter.scatter_mean(
-                    F.one_hot(pts_semantic_mask).float(), inverse_map, dim=0)
-                voxel_semantic_mask = torch.argmax(voxel_semantic_mask, dim=-1)
+                    F.one_hot(pts_semantic_mask).float(), inverse_map, dim=0) 
+                voxel_semantic_mask = torch.argmax(voxel_semantic_mask, dim=-1) 
                 seg_label[res_voxel_coors[:, 1],
-                          res_voxel_coors[:, 2]] = voxel_semantic_mask
-                data_samples[i].gt_pts_seg.semantic_seg = seg_label
+                          res_voxel_coors[:, 2]] = voxel_semantic_mask # 같은 cell에 포함된 포인트 중에서 가장 많은 라벨값을 voxel의 대표 라벨로 지정
+                data_samples[i].gt_pts_seg.semantic_seg = seg_label # (H,W) 크기에 모두 라벨 할당
 
         voxels = torch.cat(voxels, dim=0)
         coors = torch.cat(coors, dim=0)
         voxel_dict['voxels'] = voxels
-        voxel_dict['coors'] = coors
+        voxel_dict['coors'] = coors # 각 배치별로 나뉘었던 포인트 클라우드를 하나의 거대한 포인트 클라우드로 변환??
 
         return voxel_dict
