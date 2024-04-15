@@ -118,7 +118,7 @@ class FRNetBackbone(BaseModule):
         self.stem = self._make_stem_layer(in_channels, stem_channels) # in_channels-> stem_channels//2 -> stem_channels 로 이어지는 convolution layer(bn, act 포함)
         self.point_stem = self._make_point_layer(point_in_channels, # point_in_channels-> stem_channels로 이어지는 Linear layer(bn,act 포함)
                                                  stem_channels)
-        self.fusion_stem = self._make_fusion_layer(stem_channels * 2, # stem_channels * 2 -> stem_channels로 이어지는 conv(bn, act 포함)
+        self.fusion_stem = self._make_fusion_layer(stem_channels * 2, # stem_channels * 2 -> stem_channels로 이어지는 conv(bn, act 포함) point의 feature와 frustum feature의 concat이기 때문에 x2인듯
                                                    stem_channels)
 
         inplanes = stem_channels #128
