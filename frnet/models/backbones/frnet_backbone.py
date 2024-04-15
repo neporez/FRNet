@@ -83,45 +83,45 @@ class FRNetBackbone(BaseModule):
     }
 
     def __init__(self,
-                 in_channels: int,
-                 point_in_channels: int,
-                 output_shape: Sequence[int],
-                 depth: int,
-                 stem_channels: int = 128,
+                 in_channels: int, #compressed 된 feature 크기와 같아야함, 이 코드에서는 16
+                 point_in_channels: int, # 
+                 output_shape: Sequence[int], # 논문에서는 (64,512) 
+                 depth: int, # res18, res34 중 골라서 쓰는 듯, 이 코드에서는 34
+                 stem_channels: int = 128, 
                  num_stages: int = 4,
                  out_channels: Sequence[int] = (128, 128, 128, 128),
                  strides: Sequence[int] = (1, 2, 2, 2),
-                 dilations: Sequence[int] = (1, 1, 1, 1),
+                 dilations: Sequence[int] = (1, 1, 1, 1), # dilated convolution인듯? 세그멘테이션에서 효율 좋음
                  fuse_channels: Sequence[int] = (256, 128),
                  conv_cfg: OptConfigType = None,
-                 norm_cfg: ConfigType = dict(type='BN'),
-                 point_norm_cfg: ConfigType = dict(type='BN1d'),
-                 act_cfg: ConfigType = dict(type='LeakyReLU'),
+                 norm_cfg: ConfigType = dict(type='BN'), # batch_norm_2d 
+                 point_norm_cfg: ConfigType = dict(type='BN1d'), # batch_norm_1d
+                 act_cfg: ConfigType = dict(type='LeakyReLU'), # activation function(이 코드에서는 HSwish(Hard Swish))
                  init_cfg: OptMultiConfig = None) -> None:
         super(FRNetBackbone, self).__init__(init_cfg)
 
         if depth not in self.arch_settings:
-            raise KeyError(f'invalid depth {depth} for FRNetBackbone.')
+            raise KeyError(f'invalid depth {depth} for FRNetBackbone.') # depth 확인
 
-        self.block, stage_blocks = self.arch_settings[depth]
-        self.output_shape = output_shape
-        self.ny = output_shape[0]
-        self.nx = output_shape[1]
+        self.block, stage_blocks = self.arch_settings[depth] #(BasicBlock, (3,4,6,3))
+        self.output_shape = output_shape # (64,512)
+        self.ny = output_shape[0] # 64
+        self.nx = output_shape[1] # 512
         assert len(stage_blocks) == len(out_channels) == len(strides) == len(
             dilations) == num_stages, \
             'The length of stage_blocks, out_channels, strides and ' \
-            'dilations should be equal to num_stages.'
+            'dilations should be equal to num_stages.' # 블록, 채널, 스트라이드, dilations length 같은지 확인
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.point_norm_cfg = point_norm_cfg
         self.act_cfg = act_cfg
-        self.stem = self._make_stem_layer(in_channels, stem_channels)
-        self.point_stem = self._make_point_layer(point_in_channels,
+        self.stem = self._make_stem_layer(in_channels, stem_channels) # in_channels-> stem_channels//2 -> stem_channels 로 이어지는 convolution layer(bn, act 포함)
+        self.point_stem = self._make_point_layer(point_in_channels, # point_in_channels-> stem_channels로 이어지는 Linear layer(bn,act 포함)
                                                  stem_channels)
-        self.fusion_stem = self._make_fusion_layer(stem_channels * 2,
+        self.fusion_stem = self._make_fusion_layer(stem_channels * 2, # stem_channels * 2 -> stem_channels로 이어지는 conv(bn, act 포함)
                                                    stem_channels)
 
-        inplanes = stem_channels
+        inplanes = stem_channels #128
         self.res_layers = []
         self.point_fusion_layers = nn.ModuleList()
         self.pixel_fusion_layers = nn.ModuleList()
