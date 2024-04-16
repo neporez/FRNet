@@ -309,7 +309,7 @@ class FRNetBackbone(BaseModule):
         map_point_feats = self.pixel2point(x, pts_coors, stride=1) # (N, channel=128)
         fusion_point_feats = torch.cat((map_point_feats, point_feats), dim=1) #(N, 128+256)
         point_feats = self.point_stem(fusion_point_feats) # (N, 128) 차원 축소 
-        stride_voxel_coors, frustum_feats = self.point2frustum(
+        stride_voxel_coors, frustum_feats = self.point2frustum( # frustum에 속한 point중에서의 feature를 local max한 후에 voxel마다 frustum feature로 저장
             point_feats, pts_coors, stride=1)
         pixel_feats = self.frustum2pixel(
             frustum_feats, stride_voxel_coors, batch_size, stride=1)
