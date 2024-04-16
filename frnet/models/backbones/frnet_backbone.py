@@ -298,17 +298,17 @@ class FRNetBackbone(BaseModule):
 
     def forward(self, voxel_dict: dict) -> dict:
 
-        point_feats = voxel_dict['point_feats'][-1] # 각 레이어마다 저장했기 때문에 마지막 레이어의 결과를 가져오는 것 같음
+        point_feats = voxel_dict['point_feats'][-1] # 각 레이어마다 저장했기 때문에 마지막 레이어의 결과를 가져오는 것 같음 (N,256)
         voxel_feats = voxel_dict['voxel_feats']
         voxel_coors = voxel_dict['voxel_coors']
-        pts_coors = voxel_dict['coors']
-        batch_size = pts_coors[-1, 0].item() + 1
+        pts_coors = voxel_dict['coors'] # (N, 3) -> (y,x,batch index)
+        batch_size = pts_coors[-1, 0].item() + 1 # 마지막 포인트의 batch index에 1을 더하면 batch size와 같음(index가 0부터 시작되었기 때문)
 
-        x = self.frustum2pixel(voxel_feats, voxel_coors, batch_size, stride=1)
-        x = self.stem(x)
-        map_point_feats = self.pixel2point(x, pts_coors, stride=1)
-        fusion_point_feats = torch.cat((map_point_feats, point_feats), dim=1)
-        point_feats = self.point_stem(fusion_point_feats)
+        x = self.frustum2pixel(voxel_feats, voxel_coors, batch_size, stride=1) # (batch size, channel=16, 64,512)
+        x = self.stem(x) # (batch size, channel=128, 64,512)
+        map_point_feats = self.pixel2point(x, pts_coors, stride=1) # (N, channel=128)
+        fusion_point_feats = torch.cat((map_point_feats, point_feats), dim=1) #(N, 128+256)
+        point_feats = self.point_stem(fusion_point_feats) # (N, 128) 차원 축소 
         stride_voxel_coors, frustum_feats = self.point2frustum(
             point_feats, pts_coors, stride=1)
         pixel_feats = self.frustum2pixel(
@@ -375,20 +375,20 @@ class FRNetBackbone(BaseModule):
         nx = self.nx // stride
         ny = self.ny // stride
         pixel_features = torch.zeros(
-            (batch_size, ny, nx, frustum_features.shape[-1]),
+            (batch_size, ny, nx, frustum_features.shape[-1]), # (batch size, ny, nx, voxel의 feature) 
             dtype=frustum_features.dtype,
             device=frustum_features.device)
         pixel_features[coors[:, 0], coors[:, 1], coors[:,
                                                        2]] = frustum_features
-        pixel_features = pixel_features.permute(0, 3, 1, 2).contiguous()
+        pixel_features = pixel_features.permute(0, 3, 1, 2).contiguous() # (batch size, voxel feature, ny, nx) 순으로 재조정
         return pixel_features
 
     def pixel2point(self,
                     pixel_features: Tensor,
                     coors: Tensor,
                     stride: int = 1) -> Tensor:
-        pixel_features = pixel_features.permute(0, 2, 3, 1).contiguous()
-        point_feats = pixel_features[coors[:, 0], coors[:, 1] // stride,
+        pixel_features = pixel_features.permute(0, 2, 3, 1).contiguous() #(batch size, ny, nx, feature)
+        point_feats = pixel_features[coors[:, 0], coors[:, 1] // stride, #(N, feature)
                                      coors[:, 2] // stride]
         return point_feats
 
