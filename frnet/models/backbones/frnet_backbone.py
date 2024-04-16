@@ -134,7 +134,7 @@ class FRNetBackbone(BaseModule):
             self.strides.append(overall_stride)
             dilation = dilations[i]
             planes = out_channels[i]
-            res_layer = self.make_res_layer(
+            res_layer = self.make_res_layer( # resnet의 Layer 쌓기 (3,4,6,3), 각각은 BasicBlock으로 이루어짐
                 block=self.block,
                 inplanes=inplanes,
                 planes=planes,
@@ -144,20 +144,21 @@ class FRNetBackbone(BaseModule):
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg)
+          
             self.point_fusion_layers.append(
-                self._make_point_layer(inplanes + planes, planes))
+                self._make_point_layer(inplanes + planes, planes)) # (256 -> 128 Channel) MLP
             self.pixel_fusion_layers.append(
-                self._make_fusion_layer(planes * 2, planes))
-            self.attention_layers.append(self._make_attention_layer(planes))
+                self._make_fusion_layer(planes * 2, planes)) #(256 -> 128 Channel) Convolution
+            self.attention_layers.append(self._make_attention_layer(planes)) # (128 -> 128) convolution -> convolution -> activation(Sigmoid) : 0~1 사이의 score로 변환인듯?
             inplanes = planes
             layer_name = f'layer{i + 1}'
             self.add_module(layer_name, res_layer)
             self.res_layers.append(layer_name)
 
-        in_channels = stem_channels + sum(out_channels)
+        in_channels = stem_channels + sum(out_channels) # (128*5)
         self.fuse_layers = []
         self.point_fuse_layers = []
-        for i, fuse_channel in enumerate(fuse_channels):
+        for i, fuse_channel in enumerate(fuse_channels): # fuse_channels : (256, 128)
             fuse_layer = ConvModule(
                 in_channels,
                 fuse_channel,
@@ -165,13 +166,13 @@ class FRNetBackbone(BaseModule):
                 padding=1,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                act_cfg=act_cfg)
-            point_fuse_layer = self._make_point_layer(in_channels,
+                act_cfg=act_cfg) 
+            point_fuse_layer = self._make_point_layer(in_channels, 
                                                       fuse_channel)
             in_channels = fuse_channel
             layer_name = f'fuse_layer{i + 1}'
             point_layer_name = f'point_fuse_layer{i + 1}'
-            self.add_module(layer_name, fuse_layer)
+            self.add_module(layer_name, fuse_layer) 
             self.add_module(point_layer_name, point_fuse_layer)
             self.fuse_layers.append(layer_name)
             self.point_fuse_layers.append(point_layer_name)
@@ -297,7 +298,7 @@ class FRNetBackbone(BaseModule):
 
     def forward(self, voxel_dict: dict) -> dict:
 
-        point_feats = voxel_dict['point_feats'][-1]
+        point_feats = voxel_dict['point_feats'][-1] # 각 레이어마다 저장했기 때문에 마지막 레이어의 결과를 가져오는 것 같음
         voxel_feats = voxel_dict['voxel_feats']
         voxel_coors = voxel_dict['voxel_coors']
         pts_coors = voxel_dict['coors']
