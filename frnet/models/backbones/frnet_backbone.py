@@ -310,7 +310,7 @@ class FRNetBackbone(BaseModule):
         fusion_point_feats = torch.cat((map_point_feats, point_feats), dim=1) #(N, 128+256)
         point_feats = self.point_stem(fusion_point_feats) # (N, 128) 차원 축소 
         stride_voxel_coors, frustum_feats = self.point2frustum( # frustum에 속한 point중에서의 feature를 local max한 후에 voxel마다 frustum feature로 저장
-            point_feats, pts_coors, stride=1)
+            point_feats, pts_coors, stride=1) (batch size,H,W),()
         pixel_feats = self.frustum2pixel(
             frustum_feats, stride_voxel_coors, batch_size, stride=1)
         fusion_pixel_feats = torch.cat((pixel_feats, x), dim=1)
@@ -388,7 +388,7 @@ class FRNetBackbone(BaseModule):
                     coors: Tensor,
                     stride: int = 1) -> Tensor:
         pixel_features = pixel_features.permute(0, 2, 3, 1).contiguous() #(batch size, ny, nx, feature)
-        point_feats = pixel_features[coors[:, 0], coors[:, 1] // stride, #(N, feature)
+        point_feats = pixel_features[coors[:, 0], coors[:, 1] // stride, #(batch size, N, feature)
                                      coors[:, 2] // stride]
         return point_feats
 
@@ -399,8 +399,8 @@ class FRNetBackbone(BaseModule):
         coors = pts_coors.clone()
         coors[:, 1] = pts_coors[:, 1] // stride
         coors[:, 2] = pts_coors[:, 2] // stride
-        voxel_coors, inverse_map = torch.unique(
-            coors, return_inverse=True, dim=0)
+        voxel_coors, inverse_map = torch.unique( # voxel_coors : (batch size, H,W)
+            coors, return_inverse=True, dim=0) 
         frustum_features = torch_scatter.scatter_max(
             point_features, inverse_map, dim=0)[0]
         return voxel_coors, frustum_features
