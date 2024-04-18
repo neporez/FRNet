@@ -113,7 +113,7 @@ class FrustumFeatureEncoder(nn.Module):
             voxel_feats = self.compression_layers(voxel_feats) # maxpooling 이후 compression
 
         voxel_dict['voxel_feats'] = voxel_feats # 각 셀의 feature
-        voxel_dict['voxel_coors'] = voxel_coors # 각 셀의 y,x
+        voxel_dict['voxel_coors'] = voxel_coors # 각 셀의 y,x,batchsize
         voxel_dict['point_feats'] = point_feats # 각 레이어를 거쳤을때마다의 point feature
 
         return voxel_dict
