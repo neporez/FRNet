@@ -299,8 +299,8 @@ class FRNetBackbone(BaseModule):
     def forward(self, voxel_dict: dict) -> dict:
 
         point_feats = voxel_dict['point_feats'][-1] # 각 레이어마다 저장했기 때문에 마지막 레이어의 결과를 가져오는 것 같음 (N,256)
-        voxel_feats = voxel_dict['voxel_feats']
-        voxel_coors = voxel_dict['voxel_coors']
+        voxel_feats = voxel_dict['voxel_feats'] # (M,C)
+        voxel_coors = voxel_dict['voxel_coors'] # (M,3)
         pts_coors = voxel_dict['coors'] # (N, 3) -> (y,x,batch index)
         batch_size = pts_coors[-1, 0].item() + 1 # 마지막 포인트의 batch index에 1을 더하면 batch size와 같음(index가 0부터 시작되었기 때문)
 
@@ -310,29 +310,29 @@ class FRNetBackbone(BaseModule):
         fusion_point_feats = torch.cat((map_point_feats, point_feats), dim=1) #(N, 128+256)
         point_feats = self.point_stem(fusion_point_feats) # (N, 128) 차원 축소 
         stride_voxel_coors, frustum_feats = self.point2frustum( # frustum에 속한 point중에서의 feature를 local max한 후에 voxel마다 frustum feature로 저장
-            point_feats, pts_coors, stride=1) (batch size,H,W),()
+            point_feats, pts_coors, stride=1) #(M,3),(M,128) -> (batch,y,x) , (features)
         pixel_feats = self.frustum2pixel(
-            frustum_feats, stride_voxel_coors, batch_size, stride=1)
-        fusion_pixel_feats = torch.cat((pixel_feats, x), dim=1)
-        x = self.fusion_stem(fusion_pixel_feats)
+            frustum_feats, stride_voxel_coors, batch_size, stride=1)  # (batch, 128, 64, 512)
+        fusion_pixel_feats = torch.cat((pixel_feats, x), dim=1) # (batch, 256, 64, 512)
+        x = self.fusion_stem(fusion_pixel_feats)  # (batch, 128, 64, 512)
 
-        outs = [x]
-        out_points = [point_feats]
+        outs = [x]  # [(batch, 128, 64, 512)]
+        out_points = [point_feats] #[(N, 128)]
         for i, layer_name in enumerate(self.res_layers):
             res_layer = getattr(self, layer_name)
             x = res_layer(x)
 
             # frustum-to-point fusion
             map_point_feats = self.pixel2point(
-                x, pts_coors, stride=self.strides[i])
+                x, pts_coors, stride=self.strides[i]) #[(N, 128)]
             fusion_point_feats = torch.cat((map_point_feats, point_feats),
-                                           dim=1)
-            point_feats = self.point_fusion_layers[i](fusion_point_feats)
+                                           dim=1) #[(N, 256)]
+            point_feats = self.point_fusion_layers[i](fusion_point_feats) #[(N, 128)]
 
             # point-to-frustum fusion
             stride_voxel_coors, frustum_feats = self.point2frustum(
-                point_feats, pts_coors, stride=self.strides[i])
-            pixel_feats = self.frustum2pixel(
+                point_feats, pts_coors, stride=self.strides[i])  # stride_voxel_coors: (M, 3), frustum_feats: (M, 128)
+            pixel_feats = self.frustum2pixel( # (batch, 128, 64, 512)
                 frustum_feats,
                 stride_voxel_coors,
                 batch_size,
@@ -401,6 +401,6 @@ class FRNetBackbone(BaseModule):
         coors[:, 2] = pts_coors[:, 2] // stride
         voxel_coors, inverse_map = torch.unique( # voxel_coors : (batch size, H,W)
             coors, return_inverse=True, dim=0) 
-        frustum_features = torch_scatter.scatter_max(
+        frustum_features = torch_scatter.scatter_max( (batch size, 128)
             point_features, inverse_map, dim=0)[0]
         return voxel_coors, frustum_features
