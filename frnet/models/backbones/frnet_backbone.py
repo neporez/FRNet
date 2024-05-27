@@ -301,7 +301,7 @@ class FRNetBackbone(BaseModule):
         point_feats = voxel_dict['point_feats'][-1] # 각 레이어마다 저장했기 때문에 마지막 레이어의 결과를 가져오는 것 같음 (N,256)
         voxel_feats = voxel_dict['voxel_feats'] # (M,C)
         voxel_coors = voxel_dict['voxel_coors'] # (M,3)
-        pts_coors = voxel_dict['coors'] # (N, 3) -> (y,x,batch index)
+        pts_coors = voxel_dict['coors'] # (N, 3) -> (batch_index,y,x)
         batch_size = pts_coors[-1, 0].item() + 1 # 마지막 포인트의 batch index에 1을 더하면 batch size와 같음(index가 0부터 시작되었기 때문)
 
         x = self.frustum2pixel(voxel_feats, voxel_coors, batch_size, stride=1) # (batch size, channel=16, 64,512)
