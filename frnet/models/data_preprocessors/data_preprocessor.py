@@ -103,7 +103,7 @@ class FrustumRangePreprocessor(BaseDataPreprocessor):
                 coors_y, min=0, max=self.H - 1).type(torch.int64)
 
             res_coors = torch.stack([coors_y, coors_x], dim=1)
-            res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i) # (N=point 개수, 3) -> 각 값 (y,x,batch_index)
+            res_coors = F.pad(res_coors, (1, 0), mode='constant', value=i) # (N=point 개수, 3) -> 각 값 (batch_index,y,x)
             coors.append(res_coors)
             voxels.append(res)
 
